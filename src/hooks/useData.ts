@@ -20,9 +20,12 @@ async function fetchData<T>(path: string, cacheKey: keyof typeof dataCache): Pro
     return dataCache[cacheKey] as T
   }
   
-  const response = await fetch(path)
+  // Use BASE_URL for GitHub Pages deployment
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  const fullPath = `${baseUrl}${path.startsWith('/') ? path.slice(1) : path}`
+  const response = await fetch(fullPath)
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${path}: ${response.statusText}`)
+    throw new Error(`Failed to fetch ${fullPath}: ${response.statusText}`)
   }
   
   const data = await response.json()
