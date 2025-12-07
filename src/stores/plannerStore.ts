@@ -213,7 +213,7 @@ export function calculateGroupCompletion(
 
 // Calculate overall program completion
 export function calculateProgramCompletion(
-  requirementGroups: RequirementGroup[],
+  _requirementGroups: RequirementGroup[],
   allUnits: Record<string, string>,
   completedUnits: Set<string>
 ): { completedUnits: number; totalUnits: number; percentage: number } {

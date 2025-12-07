@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useUnit, useUnitsData } from '@/hooks/useData'
-import { getUnitCost, getSemestersFromOfferings, getLocationsFromOfferings, hasExam } from '@/types'
+import { getUnitCost, getSemestersFromOfferings, hasExam } from '@/types'
 import { usePlannerStore } from '@/stores/plannerStore'
 import { SkeletonUnitDetail } from '@/components/Skeleton'
 
@@ -42,7 +42,6 @@ export function UnitPage() {
   const coreqs = unit.requisites?.corequisites || []
   const prohibitions = unit.requisites?.prohibitions || []
   const semesters = getSemestersFromOfferings(unit.offerings)
-  const locations = getLocationsFromOfferings(unit.offerings)
   const hasExamAssessment = hasExam(unit.assessments)
 
   return (
@@ -188,7 +187,7 @@ export function UnitPage() {
           ) : (
             <p className="text-theme-muted">No prerequisites required</p>
           )}
-          {unit.requisites?.cp_required > 0 && (
+          {unit.requisites?.cp_required && unit.requisites.cp_required > 0 && (
             <p className="mt-3 text-sm text-theme-tertiary">
               Credit points required: {unit.requisites.cp_required}
             </p>

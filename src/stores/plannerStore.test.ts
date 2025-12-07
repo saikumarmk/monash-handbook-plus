@@ -37,7 +37,7 @@ describe('usePlannerStore', () => {
 
   describe('addUnit', () => {
     it('adds a unit to the planner', () => {
-      const { addUnit, units } = usePlannerStore.getState()
+      const { addUnit } = usePlannerStore.getState()
       addUnit(mockUnit)
       
       const state = usePlannerStore.getState()

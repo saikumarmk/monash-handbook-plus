@@ -80,7 +80,7 @@ export function PlannerPage() {
   
   // Get units unlocked by current planner
   const plannerCodes = units.map(u => u.code)
-  const { unlockedUnits, loading: unlockedLoading } = useUnlockedUnits(plannerCodes)
+  const { unlockedUnits } = useUnlockedUnits(plannerCodes)
   
   // Filter to only show units where all prereqs are met
   const availableUnits = unlockedUnits.filter(u => u.allPrereqsMet)

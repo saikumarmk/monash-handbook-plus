@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useUnitsData } from '@/hooks/useData'
-import { getSemestersFromOfferings, getUnitLevel, getUnitCost, ProcessedUnit } from '@/types'
+import { getSemestersFromOfferings, getUnitLevel, getUnitCost } from '@/types'
 import { usePlannerStore } from '@/stores/plannerStore'
 
 interface PathNode {

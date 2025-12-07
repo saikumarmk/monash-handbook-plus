@@ -77,7 +77,7 @@ export function HomePage() {
         return true
       })
       .slice(0, 100)
-      .map(([code, unit]) => ({ code, ...unit }))
+      .map(([unitCode, unit]) => ({ ...unit, code: unitCode }))
   }, [unitsData, query, selectedSchool, selectedLevel, selectedBand, selectedSemester, selectedLocation, noExamOnly])
 
   if (error) {

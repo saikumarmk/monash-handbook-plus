@@ -4,8 +4,7 @@ import type {
   AreasOfStudyData, 
   CoursesData, 
   NetworkData,
-  ProcessedUnit,
-  UnitNode 
+  ProcessedUnit
 } from '@/types'
 
 // Cache for loaded data
@@ -156,7 +155,7 @@ export function useUnitSearch(query: string, filters?: {
         return true
       })
       .slice(0, 50) // Limit results
-      .map(([code, unit]) => ({ code, ...unit }))
+      .map(([unitCode, unit]) => ({ ...unit, code: unitCode }))
   }, [data, query, filters?.school, filters?.level, filters?.scaBand])
 
   return { results, loading, error }
