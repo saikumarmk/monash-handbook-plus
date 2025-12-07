@@ -7,6 +7,8 @@ import path from 'path'
 // import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Set base for GitHub Pages - change 'monash-handbook' to your repo name
+  base: process.env.BASE_URL || '/',
   plugins: [
     react(), 
     tailwindcss(),
