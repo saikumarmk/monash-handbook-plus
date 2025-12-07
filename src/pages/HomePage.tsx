@@ -1,18 +1,34 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useUnitsData, useSchools } from '@/hooks/useData'
-import { getUnitCost, getUnitLevel } from '@/types'
+import { getUnitCost, getUnitLevel, getSemestersFromOfferings, getLocationsFromOfferings, hasExam, getPrereqDepth } from '@/types'
 import { usePlannerStore } from '@/stores/plannerStore'
+import { SkeletonGrid } from '@/components/Skeleton'
 
 export function HomePage() {
   const [query, setQuery] = useState('')
   const [selectedSchool, setSelectedSchool] = useState<string>('')
   const [selectedLevel, setSelectedLevel] = useState<number | ''>('')
   const [selectedBand, setSelectedBand] = useState<string>('')
+  const [selectedSemester, setSelectedSemester] = useState<string>('')
+  const [selectedLocation, setSelectedLocation] = useState<string>('')
+  const [noExamOnly, setNoExamOnly] = useState(false)
   
   const { data: unitsData, loading, error } = useUnitsData()
   const { schools } = useSchools()
   const { addUnit, removeUnit, hasUnit } = usePlannerStore()
+
+  // Get all unique locations from data
+  const allLocations = useMemo(() => {
+    if (!unitsData) return []
+    const locations = new Set<string>()
+    for (const unit of Object.values(unitsData)) {
+      for (const loc of getLocationsFromOfferings(unit.offerings)) {
+        locations.add(loc)
+      }
+    }
+    return Array.from(locations).sort()
+  }, [unitsData])
 
   const results = useMemo(() => {
     if (!unitsData) return []
@@ -23,7 +39,7 @@ export function HomePage() {
     return entries
       .filter(([code, unit]) => {
         // If no query and no filters, show nothing (or show featured)
-        if (!q && !selectedSchool && !selectedLevel && !selectedBand) {
+        if (!q && !selectedSchool && !selectedLevel && !selectedBand && !selectedSemester && !selectedLocation && !noExamOnly) {
           return false
         }
         
@@ -41,20 +57,35 @@ export function HomePage() {
           const unitLevel = getUnitLevel(code)
           if (unitLevel !== selectedLevel) return false
         }
-        if (selectedBand && (!unit.sca_band || !unit.sca_band.includes(selectedBand))) return false
+        if (selectedBand && (!unit.sca_band || !String(unit.sca_band).includes(selectedBand))) return false
+        
+        // Semester filter
+        if (selectedSemester) {
+          const semesters = getSemestersFromOfferings(unit.offerings)
+          if (!semesters.includes(selectedSemester)) return false
+        }
+        
+        // Location filter
+        if (selectedLocation) {
+          const locations = getLocationsFromOfferings(unit.offerings)
+          if (!locations.includes(selectedLocation)) return false
+        }
+        
+        // No exam filter
+        if (noExamOnly && hasExam(unit.assessments)) return false
         
         return true
       })
       .slice(0, 100)
       .map(([code, unit]) => ({ code, ...unit }))
-  }, [unitsData, query, selectedSchool, selectedLevel, selectedBand])
+  }, [unitsData, query, selectedSchool, selectedLevel, selectedBand, selectedSemester, selectedLocation, noExamOnly])
 
   if (error) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-display font-bold text-danger mb-2">Failed to load data</h2>
-          <p className="text-gray-400">{error.message}</p>
+          <p className="text-theme-tertiary">{error.message}</p>
         </div>
       </div>
     )
@@ -64,10 +95,10 @@ export function HomePage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-4">
+        <h1 className="text-4xl md:text-5xl font-display font-bold text-theme-primary mb-4">
           Explore <span className="text-electric">Monash</span> Units
         </h1>
-        <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+        <p className="text-lg text-theme-tertiary max-w-2xl mx-auto">
           Search thousands of units, see prerequisites and what they unlock, 
           calculate costs, and plan your degree.
         </p>
@@ -77,7 +108,7 @@ export function HomePage() {
       <div className="max-w-3xl mx-auto mb-8">
         <div className="relative">
           <svg 
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-500"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-theme-muted"
             fill="none" viewBox="0 0 24 24" stroke="currentColor"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -87,7 +118,7 @@ export function HomePage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by unit code or name (e.g., FIT1045, programming)..."
-            className="w-full pl-14 pr-4 py-4 bg-navy-800 border border-navy-700 rounded-xl text-white placeholder-gray-500 text-lg focus:outline-none focus:border-electric focus:ring-2 focus:ring-electric/20 transition-all"
+            className="w-full pl-14 pr-4 py-4 bg-theme-card border border-theme-primary rounded-xl text-theme-primary placeholder-theme-muted text-lg focus:outline-none focus:border-electric focus:ring-2 focus:ring-electric/20 transition-all"
             autoFocus
           />
           {loading && (
@@ -99,11 +130,11 @@ export function HomePage() {
       </div>
 
       {/* Filters */}
-      <div className="max-w-3xl mx-auto mb-8 flex flex-wrap gap-3">
+      <div className="max-w-4xl mx-auto mb-8 flex flex-wrap gap-3 items-center">
         <select
           value={selectedSchool}
           onChange={(e) => setSelectedSchool(e.target.value)}
-          className="px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-white text-sm focus:outline-none focus:border-electric"
+          className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary text-sm focus:outline-none focus:border-electric"
         >
           <option value="">All Schools</option>
           {schools.map(school => (
@@ -114,7 +145,7 @@ export function HomePage() {
         <select
           value={selectedLevel}
           onChange={(e) => setSelectedLevel(e.target.value ? parseInt(e.target.value) : '')}
-          className="px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-white text-sm focus:outline-none focus:border-electric"
+          className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary text-sm focus:outline-none focus:border-electric"
         >
           <option value="">All Levels</option>
           <option value="1">Level 1</option>
@@ -124,9 +155,32 @@ export function HomePage() {
         </select>
 
         <select
+          value={selectedSemester}
+          onChange={(e) => setSelectedSemester(e.target.value)}
+          className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary text-sm focus:outline-none focus:border-electric"
+        >
+          <option value="">All Semesters</option>
+          <option value="S1">Semester 1</option>
+          <option value="S2">Semester 2</option>
+          <option value="Summer">Summer</option>
+          <option value="Winter">Winter</option>
+        </select>
+
+        <select
+          value={selectedLocation}
+          onChange={(e) => setSelectedLocation(e.target.value)}
+          className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary text-sm focus:outline-none focus:border-electric"
+        >
+          <option value="">All Locations</option>
+          {allLocations.map(loc => (
+            <option key={loc} value={loc}>{loc}</option>
+          ))}
+        </select>
+
+        <select
           value={selectedBand}
           onChange={(e) => setSelectedBand(e.target.value)}
-          className="px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-white text-sm focus:outline-none focus:border-electric"
+          className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary text-sm focus:outline-none focus:border-electric"
         >
           <option value="">All Cost Bands</option>
           <option value="1">Band 1 (Lowest)</option>
@@ -135,43 +189,67 @@ export function HomePage() {
           <option value="4">Band 4 (Highest)</option>
         </select>
 
-        {(selectedSchool || selectedLevel || selectedBand) && (
+        <label className="flex items-center gap-2 px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary text-sm cursor-pointer hover:border-electric transition-colors">
+          <input
+            type="checkbox"
+            checked={noExamOnly}
+            onChange={(e) => setNoExamOnly(e.target.checked)}
+            className="w-4 h-4 rounded bg-theme-tertiary border-theme-secondary text-electric focus:ring-electric"
+          />
+          <span>No Exams</span>
+        </label>
+
+        {(selectedSchool || selectedLevel || selectedBand || selectedSemester || selectedLocation || noExamOnly) && (
           <button
             onClick={() => {
               setSelectedSchool('')
               setSelectedLevel('')
               setSelectedBand('')
+              setSelectedSemester('')
+              setSelectedLocation('')
+              setNoExamOnly(false)
             }}
-            className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-sm text-theme-tertiary hover:text-theme-primary transition-colors"
           >
             Clear filters
           </button>
         )}
       </div>
 
+      {/* Loading State */}
+      {loading && query && (
+        <>
+          <div className="mb-4 text-sm text-theme-tertiary">Loading...</div>
+          <SkeletonGrid count={6} />
+        </>
+      )}
+
       {/* Results */}
-      {results.length > 0 && (
-        <div className="mb-4 text-sm text-gray-400">
+      {!loading && results.length > 0 && (
+        <div className="mb-4 text-sm text-theme-tertiary">
           Showing {results.length} result{results.length !== 1 ? 's' : ''}
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {!loading && <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {results.map((unit) => {
           const cost = getUnitCost(unit.sca_band, parseInt(unit.credit_points) || 6)
           const isInPlanner = hasUnit(unit.code)
+          const semesters = getSemestersFromOfferings(unit.offerings)
+          const hasExamAssessment = hasExam(unit.assessments)
+          const prereqDepth = unitsData ? getPrereqDepth(unit.code, unitsData) : 0
           
           return (
             <div
               key={unit.code}
-              className="group bg-navy-800/50 border border-navy-700 rounded-xl p-5 hover:border-electric/50 hover:bg-navy-800 transition-all"
+              className="group bg-theme-card border border-theme-primary rounded-xl p-5 hover:border-electric/50 transition-all"
             >
               <div className="flex items-start justify-between gap-3 mb-3">
                 <Link to={`/unit/${unit.code}`} className="flex-1 min-w-0">
                   <h3 className="font-mono text-lg font-semibold text-electric-bright group-hover:text-electric transition-colors">
                     {unit.code}
                   </h3>
-                  <p className="text-white font-medium mt-1 line-clamp-2">
+                  <p className="text-theme-primary font-medium mt-1 line-clamp-2">
                     {unit.title}
                   </p>
                 </Link>
@@ -180,7 +258,7 @@ export function HomePage() {
                   className={`shrink-0 p-2 rounded-lg transition-colors ${
                     isInPlanner
                       ? 'bg-success/20 text-success hover:bg-success/30'
-                      : 'bg-navy-700 text-gray-400 hover:text-electric hover:bg-navy-600'
+                      : 'bg-theme-tertiary text-theme-tertiary hover:text-electric hover:bg-theme-secondary'
                   }`}
                   title={isInPlanner ? 'Remove from planner' : 'Add to planner'}
                 >
@@ -197,7 +275,7 @@ export function HomePage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="px-2 py-0.5 bg-navy-700 rounded text-gray-300">
+                <span className="px-2 py-0.5 bg-theme-tertiary rounded text-theme-secondary">
                   {unit.credit_points} CP
                 </span>
                 {cost > 0 && (
@@ -205,60 +283,84 @@ export function HomePage() {
                     ${cost}
                   </span>
                 )}
-                <span className="text-gray-500 truncate max-w-[200px]" title={unit.school}>
+                {semesters.length > 0 && (
+                  <span className="px-2 py-0.5 bg-electric/10 text-electric-bright rounded">
+                    {semesters.join('/')}
+                  </span>
+                )}
+                {hasExamAssessment !== undefined && (
+                  <span className={`px-2 py-0.5 rounded ${
+                    hasExamAssessment 
+                      ? 'bg-danger/20 text-danger' 
+                      : 'bg-success/20 text-success'
+                  }`}>
+                    {hasExamAssessment ? '📝' : '✓'}
+                  </span>
+                )}
+                {prereqDepth > 0 && (
+                  <span 
+                    className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded"
+                    title={`Requires ${prereqDepth} prerequisite unit${prereqDepth > 1 ? 's' : ''} chain`}
+                  >
+                    🔗{prereqDepth}
+                  </span>
+                )}
+              </div>
+              <div className="mt-2">
+                <span className="text-theme-muted text-xs truncate block" title={unit.school}>
                   {unit.school}
                 </span>
               </div>
             </div>
           )
         })}
-      </div>
+      </div>}
 
       {/* Empty State */}
       {query && results.length === 0 && !loading && (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🔍</div>
-          <h3 className="text-xl font-display font-semibold text-white mb-2">
+          <h3 className="text-xl font-display font-semibold text-theme-primary mb-2">
             No units found
           </h3>
-          <p className="text-gray-400">
+          <p className="text-theme-tertiary">
             Try a different search term or adjust your filters
           </p>
         </div>
       )}
 
       {/* Initial State */}
-      {!query && !selectedSchool && !selectedLevel && !selectedBand && (
+      {!query && !selectedSchool && !selectedLevel && !selectedBand && !selectedSemester && !selectedLocation && !noExamOnly && (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">📚</div>
-          <h3 className="text-xl font-display font-semibold text-white mb-2">
+          <h3 className="text-xl font-display font-semibold text-theme-primary mb-2">
             Start searching
           </h3>
-          <p className="text-gray-400 mb-6">
+          <p className="text-theme-tertiary mb-6">
             Enter a unit code or keyword to explore the handbook
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <button
               onClick={() => setQuery('FIT')}
-              className="px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-sm hover:border-electric transition-colors"
+              className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-sm text-theme-primary hover:border-electric transition-colors"
             >
               FIT (IT)
             </button>
             <button
               onClick={() => setQuery('MTH')}
-              className="px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-sm hover:border-electric transition-colors"
+              className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-sm text-theme-primary hover:border-electric transition-colors"
             >
               MTH (Maths)
             </button>
             <button
               onClick={() => setQuery('ENG')}
-              className="px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-sm hover:border-electric transition-colors"
+              className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-sm text-theme-primary hover:border-electric transition-colors"
             >
               ENG (Engineering)
             </button>
             <button
               onClick={() => setQuery('programming')}
-              className="px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-sm hover:border-electric transition-colors"
+              className="px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-sm text-theme-primary hover:border-electric transition-colors"
             >
               programming
             </button>
@@ -268,6 +370,3 @@ export function HomePage() {
     </div>
   )
 }
-
-
-

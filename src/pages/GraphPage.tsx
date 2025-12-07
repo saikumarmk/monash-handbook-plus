@@ -169,7 +169,7 @@ export function GraphPage() {
       <div className="h-[calc(100vh-4rem)] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-electric border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading graph data...</p>
+          <p className="text-theme-tertiary">Loading graph data...</p>
         </div>
       </div>
     )
@@ -180,7 +180,7 @@ export function GraphPage() {
       <div className="h-[calc(100vh-4rem)] flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-display font-bold text-danger mb-2">Failed to load graph</h2>
-          <p className="text-gray-400">{error.message}</p>
+          <p className="text-theme-tertiary">{error.message}</p>
         </div>
       </div>
     )
@@ -191,22 +191,22 @@ export function GraphPage() {
   return (
     <div className="h-[calc(100vh-4rem)] flex">
       {/* Sidebar Controls */}
-      <div className="w-80 bg-navy-900 border-r border-navy-700 p-4 flex flex-col overflow-hidden shrink-0">
-        <h2 className="text-lg font-display font-bold text-white mb-4">Graph Controls</h2>
+      <div className="w-80 bg-navy-900 border-r border-theme-primary p-4 flex flex-col overflow-hidden shrink-0">
+        <h2 className="text-lg font-display font-bold text-theme-primary mb-4">Graph Controls</h2>
         
         {/* Planner Mode Toggle */}
         {plannerUnits.length > 0 && (
-          <div className="mb-4 p-3 bg-navy-800 rounded-lg border border-navy-700">
+          <div className="mb-4 p-3 bg-theme-card rounded-lg border border-theme-primary">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={plannerMode}
                 onChange={(e) => setPlannerMode(e.target.checked)}
-                className="w-4 h-4 rounded border-navy-600 bg-navy-800 text-electric focus:ring-electric focus:ring-offset-0"
+                className="w-4 h-4 rounded border-navy-600 bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
               />
               <div>
-                <span className="text-white font-medium">Show Planner Units</span>
-                <p className="text-xs text-gray-400">{plannerUnits.length} units in planner</p>
+                <span className="text-theme-primary font-medium">Show Planner Units</span>
+                <p className="text-xs text-theme-tertiary">{plannerUnits.length} units in planner</p>
               </div>
             </label>
           </div>
@@ -219,18 +219,18 @@ export function GraphPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Unit code (e.g., FIT1045)"
-            className="w-full px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-electric"
+            className="w-full px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary placeholder-gray-500 focus:outline-none focus:border-electric"
             disabled={plannerMode}
           />
         </form>
 
         {/* School filter */}
         <div className="mb-4">
-          <label className="block text-sm text-gray-400 mb-2">Filter by School</label>
+          <label className="block text-sm text-theme-tertiary mb-2">Filter by School</label>
           <select
             value={selectedSchool}
             onChange={(e) => setSelectedSchool(e.target.value)}
-            className="w-full px-4 py-2 bg-navy-800 border border-navy-700 rounded-lg text-white focus:outline-none focus:border-electric"
+            className="w-full px-4 py-2 bg-theme-card border border-theme-primary rounded-lg text-theme-primary focus:outline-none focus:border-electric"
             disabled={plannerMode}
           >
             <option value="">All Schools</option>
@@ -247,7 +247,7 @@ export function GraphPage() {
               type="checkbox"
               checked={showUnlocks}
               onChange={(e) => setShowUnlocks(e.target.checked)}
-              className="w-4 h-4 rounded border-navy-600 bg-navy-800 text-electric focus:ring-electric focus:ring-offset-0"
+              className="w-4 h-4 rounded border-navy-600 bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
             />
             <span className="text-gray-300">Show Unlocks</span>
           </label>
@@ -256,16 +256,16 @@ export function GraphPage() {
               type="checkbox"
               checked={showRequires}
               onChange={(e) => setShowRequires(e.target.checked)}
-              className="w-4 h-4 rounded border-navy-600 bg-navy-800 text-electric focus:ring-electric focus:ring-offset-0"
+              className="w-4 h-4 rounded border-navy-600 bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
             />
             <span className="text-gray-300">Show Prerequisites</span>
           </label>
         </div>
 
         {/* Stats */}
-        <div className="text-sm text-gray-400 mb-4">
+        <div className="text-sm text-theme-tertiary mb-4">
           <p>{filteredData.nodes.length} nodes, {filteredData.links.length} links</p>
-          <p className="text-xs text-gray-500">Total in database: {totalNodes}</p>
+          <p className="text-xs text-theme-muted">Total in database: {totalNodes}</p>
         </div>
         
         {/* Warning for large graphs */}
@@ -279,14 +279,14 @@ export function GraphPage() {
 
         {/* Selected Node Info */}
         {selectedNode && (
-          <div className="mt-auto p-4 bg-navy-800 rounded-xl border border-navy-700">
+          <div className="mt-auto p-4 bg-theme-card rounded-xl border border-theme-primary">
             <h3 className="font-mono text-lg text-electric-bright mb-1">
               {selectedNode.id}
             </h3>
-            <p className="text-white font-medium mb-3">
+            <p className="text-theme-primary font-medium mb-3">
               {selectedNode.unit_name}
             </p>
-            <p className="text-sm text-gray-400 mb-3 line-clamp-1">
+            <p className="text-sm text-theme-tertiary mb-3 line-clamp-1">
               {selectedNode.school}
             </p>
             <div className="flex gap-2 text-sm mb-3">
@@ -308,7 +308,7 @@ export function GraphPage() {
       </div>
 
       {/* Graph Canvas */}
-      <div ref={containerRef} className="flex-1 bg-navy-950 min-w-0">
+      <div ref={containerRef} className="flex-1 bg-theme-primary min-w-0">
         {filteredData.nodes.length > 0 ? (
           <ForceGraph2D
             ref={graphRef}
@@ -337,7 +337,7 @@ export function GraphPage() {
           />
         ) : (
           <div className="h-full flex items-center justify-center">
-            <div className="text-center text-gray-400">
+            <div className="text-center text-theme-tertiary">
               <p className="mb-2">No nodes to display</p>
               <p className="text-sm">Try adjusting your filters or search for a unit</p>
             </div>

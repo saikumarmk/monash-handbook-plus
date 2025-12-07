@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { usePlannerStore } from './plannerStore'
-import type { ProcessedUnit } from '@/types'
+import type { ProcessedUnit, AreaOfStudy, Course } from '@/types'
 
 const mockUnit: ProcessedUnit = {
   code: 'FIT1045',
@@ -164,6 +164,99 @@ describe('usePlannerStore', () => {
       
       const state = usePlannerStore.getState()
       expect(state.getTotalCost()).toBe(0)
+    })
+  })
+
+  describe('program tracking', () => {
+    const mockAOS: AreaOfStudy = {
+      course_code: 'COMPSCI01',
+      course_title: 'Computer Science Major',
+      total_credit_points: 48,
+      requirement_groups: [],
+      all_units: { 'FIT1045': 'Programming', 'FIT1008': 'Data Structures' },
+      statistics: { total_requirements: 2, total_units: 2, max_depth: 1 }
+    }
+
+    const mockCourse: Course = {
+      course_code: 'C2001',
+      course_title: 'Bachelor of Computer Science',
+      total_credit_points: 144,
+      requirement_groups: [],
+      all_units: { 'FIT1045': 'Programming' },
+      statistics: { total_requirements: 1, total_units: 1, max_depth: 1 }
+    }
+
+    it('adds an AOS to tracked programs', () => {
+      const { addProgram } = usePlannerStore.getState()
+      addProgram(mockAOS, 'aos')
+      
+      const state = usePlannerStore.getState()
+      expect(state.trackedPrograms).toHaveLength(1)
+      expect(state.trackedPrograms[0].code).toBe('COMPSCI01')
+      expect(state.trackedPrograms[0].type).toBe('aos')
+    })
+
+    it('adds a course to tracked programs', () => {
+      const { addProgram } = usePlannerStore.getState()
+      addProgram(mockCourse, 'course')
+      
+      const state = usePlannerStore.getState()
+      expect(state.trackedPrograms).toHaveLength(1)
+      expect(state.trackedPrograms[0].code).toBe('C2001')
+      expect(state.trackedPrograms[0].type).toBe('course')
+    })
+
+    it('does not add duplicate programs', () => {
+      const { addProgram } = usePlannerStore.getState()
+      addProgram(mockAOS, 'aos')
+      addProgram(mockAOS, 'aos')
+      
+      const state = usePlannerStore.getState()
+      expect(state.trackedPrograms).toHaveLength(1)
+    })
+
+    it('removes a program', () => {
+      const { addProgram, removeProgram } = usePlannerStore.getState()
+      addProgram(mockAOS, 'aos')
+      removeProgram('COMPSCI01')
+      
+      const state = usePlannerStore.getState()
+      expect(state.trackedPrograms).toHaveLength(0)
+    })
+
+    it('hasProgram returns true when program exists', () => {
+      const { addProgram } = usePlannerStore.getState()
+      addProgram(mockAOS, 'aos')
+      
+      const state = usePlannerStore.getState()
+      expect(state.hasProgram('COMPSCI01')).toBe(true)
+    })
+
+    it('hasProgram returns false when program does not exist', () => {
+      const state = usePlannerStore.getState()
+      expect(state.hasProgram('NONEXISTENT')).toBe(false)
+    })
+
+    it('clearPrograms removes all programs but keeps units', () => {
+      const { addUnit, addProgram, clearPrograms } = usePlannerStore.getState()
+      addUnit(mockUnit)
+      addProgram(mockAOS, 'aos')
+      clearPrograms()
+      
+      const state = usePlannerStore.getState()
+      expect(state.trackedPrograms).toHaveLength(0)
+      expect(state.units).toHaveLength(1)
+    })
+
+    it('clearAll removes both units and programs', () => {
+      const { addUnit, addProgram, clearAll } = usePlannerStore.getState()
+      addUnit(mockUnit)
+      addProgram(mockAOS, 'aos')
+      clearAll()
+      
+      const state = usePlannerStore.getState()
+      expect(state.trackedPrograms).toHaveLength(0)
+      expect(state.units).toHaveLength(0)
     })
   })
 })

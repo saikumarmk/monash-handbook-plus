@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup": "node scripts/setup-data.js",
+    "generate-icons": "python scripts/generate-icons.py",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

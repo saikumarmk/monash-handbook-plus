@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getUnitCost, getUnitLevel, getFacultyPrefix, isUnitCode, SCA_BAND_COSTS } from './index'
+import { getUnitCost, getUnitLevel, getFacultyPrefix, isUnitCode, SCA_BAND_COSTS, getPrereqDepth, ProcessedUnit } from './index'
 
 describe('getUnitCost', () => {
   it('returns correct cost for Band 1 (6CP)', () => {
@@ -151,6 +151,96 @@ describe('isUnitCode', () => {
 
   it('handles whitespace', () => {
     expect(isUnitCode(' FIT1045 ')).toBe(true)
+  })
+})
+
+describe('getPrereqDepth', () => {
+  const mockUnit = (code: string, prereqs: string[][] = []): ProcessedUnit => ({
+    code,
+    title: `Test ${code}`,
+    credit_points: '6',
+    sca_band: '2',
+    school: 'Test School',
+    academic_org: 'Test Org',
+    requisites: prereqs.length > 0 ? {
+      permission: false,
+      prohibitions: [],
+      corequisites: [],
+      prerequisites: prereqs.map(units => ({ NumReq: 1, units })),
+      cp_required: 0
+    } : undefined
+  })
+
+  it('returns 0 for unit with no prerequisites', () => {
+    const unitsData: Record<string, ProcessedUnit> = {
+      'FIT1045': mockUnit('FIT1045')
+    }
+    expect(getPrereqDepth('FIT1045', unitsData)).toBe(0)
+  })
+
+  it('returns 1 for unit with one level of prerequisites', () => {
+    const unitsData: Record<string, ProcessedUnit> = {
+      'FIT1045': mockUnit('FIT1045'),
+      'FIT1008': mockUnit('FIT1008', [['FIT1045']])
+    }
+    expect(getPrereqDepth('FIT1008', unitsData)).toBe(1)
+  })
+
+  it('returns 2 for unit with two levels of prerequisites', () => {
+    const unitsData: Record<string, ProcessedUnit> = {
+      'FIT1045': mockUnit('FIT1045'),
+      'FIT1008': mockUnit('FIT1008', [['FIT1045']]),
+      'FIT2004': mockUnit('FIT2004', [['FIT1008']])
+    }
+    expect(getPrereqDepth('FIT2004', unitsData)).toBe(2)
+  })
+
+  it('returns minimum depth when OR options exist', () => {
+    const unitsData: Record<string, ProcessedUnit> = {
+      'FIT1045': mockUnit('FIT1045'),
+      'CSE1303': mockUnit('CSE1303'),
+      'FIT1008': mockUnit('FIT1008', [['FIT1045']]),
+      'FIT2085': mockUnit('FIT2085', [['CSE1303']]),
+      // FIT2004 requires either FIT1008 (depth 1) or FIT2085 (depth 1)
+      'FIT2004': mockUnit('FIT2004', [['FIT1008', 'FIT2085']])
+    }
+    // The minimum depth path is 2 (either FIT1045->FIT1008->FIT2004 or CSE1303->FIT2085->FIT2004)
+    expect(getPrereqDepth('FIT2004', unitsData)).toBe(2)
+  })
+
+  it('handles multiple AND groups', () => {
+    const unitsData: Record<string, ProcessedUnit> = {
+      'FIT1045': mockUnit('FIT1045'),
+      'MAT1830': mockUnit('MAT1830'),
+      'FIT1008': mockUnit('FIT1008', [['FIT1045']]),
+      // FIT2014 requires FIT1008 AND MAT1830
+      'FIT2014': mockUnit('FIT2014', [['FIT1008'], ['MAT1830']])
+    }
+    // The max depth is 2 (FIT1045->FIT1008->FIT2014)
+    expect(getPrereqDepth('FIT2014', unitsData)).toBe(2)
+  })
+
+  it('handles missing prerequisite data gracefully', () => {
+    const unitsData: Record<string, ProcessedUnit> = {
+      'FIT2004': mockUnit('FIT2004', [['FIT1008']]) // FIT1008 not in data
+    }
+    expect(getPrereqDepth('FIT2004', unitsData)).toBe(0)
+  })
+
+  it('returns 0 for unit not in data', () => {
+    const unitsData: Record<string, ProcessedUnit> = {}
+    expect(getPrereqDepth('FIT9999', unitsData)).toBe(0)
+  })
+
+  it('handles circular references gracefully', () => {
+    const unitsData: Record<string, ProcessedUnit> = {
+      'FIT1001': mockUnit('FIT1001', [['FIT1002']]),
+      'FIT1002': mockUnit('FIT1002', [['FIT1001']])
+    }
+    // Should not infinite loop; circular refs return 2 as visited units contribute 0
+    const result = getPrereqDepth('FIT1001', unitsData)
+    expect(result).toBeGreaterThanOrEqual(0) // Just verify it doesn't infinite loop
+    expect(result).toBeLessThanOrEqual(10) // Sanity check
   })
 })
 

@@ -12,6 +12,18 @@ export interface UnitRequisites {
   cp_required: number
 }
 
+export interface UnitOffering {
+  location: string  // Clayton, Malaysia, etc.
+  mode: string      // ON-CAMPUS, FLEXIBLE, ONLINE
+  name: string      // e.g., "S1-01-CLAYTON-ON-CAMPUS"
+  period: string    // e.g., "First semester"
+}
+
+export interface UnitAssessment {
+  name: string
+  type: string  // exam, assignment, test, etc.
+}
+
 export interface ProcessedUnit {
   code: string
   title: string
@@ -19,7 +31,41 @@ export interface ProcessedUnit {
   sca_band: string
   school: string
   academic_org: string
+  level?: number
+  offerings?: UnitOffering[]
+  assessments?: UnitAssessment[]
   requisites?: UnitRequisites
+}
+
+// Helper to parse semester from offering period
+export function getSemestersFromOfferings(offerings?: UnitOffering[]): string[] {
+  if (!offerings) return []
+  const semesters = new Set<string>()
+  for (const o of offerings) {
+    const period = o.period.toLowerCase()
+    if (period.includes('first semester') || period.includes('semester 1')) semesters.add('S1')
+    if (period.includes('second semester') || period.includes('semester 2')) semesters.add('S2')
+    if (period.includes('summer')) semesters.add('Summer')
+    if (period.includes('winter')) semesters.add('Winter')
+    if (period.includes('october') || period.includes('oct')) semesters.add('Oct')
+    if (period.includes('february') || period.includes('feb')) semesters.add('Feb')
+  }
+  return Array.from(semesters).sort()
+}
+
+// Helper to get unique locations from offerings
+export function getLocationsFromOfferings(offerings?: UnitOffering[]): string[] {
+  if (!offerings) return []
+  return [...new Set(offerings.map(o => o.location))].sort()
+}
+
+// Helper to check if unit has exams
+export function hasExam(assessments?: UnitAssessment[]): boolean {
+  if (!assessments) return false
+  return assessments.some(a => 
+    a.type?.toLowerCase().includes('exam') || 
+    a.name?.toLowerCase().includes('exam')
+  )
 }
 
 export type ProcessedUnitsData = Record<string, ProcessedUnit>
@@ -123,6 +169,39 @@ export function getUnitLevel(code: string): number {
 export function getFacultyPrefix(code: string): string {
   const match = code.match(/^([A-Z]{2,4})/i)
   return match ? match[1].toUpperCase() : ''
+}
+
+// Calculate the depth of prerequisite chain for a unit (minimum path)
+export function getPrereqDepth(
+  unitCode: string, 
+  unitsData: Record<string, ProcessedUnit>,
+  visited: Set<string> = new Set()
+): number {
+  if (visited.has(unitCode)) return 0 // Avoid cycles
+  visited.add(unitCode)
+  
+  const unit = unitsData[unitCode]
+  if (!unit?.requisites?.prerequisites || unit.requisites.prerequisites.length === 0) {
+    return 0
+  }
+  
+  let maxDepth = 0
+  for (const group of unit.requisites.prerequisites) {
+    // For each prereq group, find the minimum depth option (best case)
+    let minGroupDepth = Infinity
+    for (const prereqCode of group.units) {
+      if (unitsData[prereqCode]) {
+        const depth = getPrereqDepth(prereqCode, unitsData, new Set(visited))
+        minGroupDepth = Math.min(minGroupDepth, depth)
+      }
+    }
+    // Add this group's contribution (if we found valid options)
+    if (minGroupDepth !== Infinity) {
+      maxDepth = Math.max(maxDepth, minGroupDepth + 1)
+    }
+  }
+  
+  return maxDepth
 }
 
 
