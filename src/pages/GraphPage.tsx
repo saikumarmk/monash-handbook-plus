@@ -2,10 +2,39 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { useNetworkData, useSchools } from '@/hooks/useData'
 import { usePlannerStore } from '@/stores/plannerStore'
+import { useThemeStore } from '@/stores/themeStore'
 import type { UnitNode } from '@/types'
 
-// Dynamic import for force graph (SSR-safe)
+// Dynamic import for force graphs
 import ForceGraph2D from 'react-force-graph-2d'
+import ForceGraph3D from 'react-force-graph-3d'
+
+// Color palette for schools (vibrant, distinguishable colors)
+const SCHOOL_COLORS: Record<string, string> = {
+  'Faculty of Information Technology': '#3b82f6', // blue
+  'Faculty of Engineering': '#f97316', // orange
+  'Faculty of Science': '#22c55e', // green
+  'Faculty of Arts': '#a855f7', // purple
+  'Faculty of Business and Economics': '#eab308', // yellow
+  'Faculty of Medicine, Nursing and Health Sciences': '#ef4444', // red
+  'Faculty of Education': '#06b6d4', // cyan
+  'Faculty of Law': '#ec4899', // pink
+  'Faculty of Art, Design and Architecture': '#f472b6', // rose
+  'Faculty of Pharmacy and Pharmaceutical Sciences': '#14b8a6', // teal
+}
+
+// Generate a color from school name if not in palette
+function getSchoolColor(school: string): string {
+  if (SCHOOL_COLORS[school]) return SCHOOL_COLORS[school]
+  
+  // Hash the school name to get a consistent color
+  let hash = 0
+  for (let i = 0; i < school.length; i++) {
+    hash = school.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue = Math.abs(hash) % 360
+  return `hsl(${hue}, 70%, 50%)`
+}
 
 export function GraphPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -15,6 +44,7 @@ export function GraphPage() {
   const { data: networkData, loading, error } = useNetworkData()
   const { schools } = useSchools()
   const { units: plannerUnits } = usePlannerStore()
+  const { theme } = useThemeStore()
   
   const [searchQuery, setSearchQuery] = useState(initialUnit)
   const [selectedSchool, setSelectedSchool] = useState('')
@@ -22,6 +52,9 @@ export function GraphPage() {
   const [showRequires, setShowRequires] = useState(true)
   const [selectedNode, setSelectedNode] = useState<UnitNode | null>(null)
   const [plannerMode, setPlannerMode] = useState(showPlanner)
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d')
+  const [colorBySchool, setColorBySchool] = useState(true)
+  const [hoverNode, setHoverNode] = useState<UnitNode | null>(null)
   
   const graphRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -53,6 +86,21 @@ export function GraphPage() {
       resizeObserver.disconnect()
     }
   }, [loading])
+
+  // Compute highlighted nodes (connected to hover node)
+  const highlightedNodes = useMemo(() => {
+    const highlighted = new Set<string>()
+    if (!hoverNode) return highlighted
+    
+    highlighted.add(hoverNode.id)
+    if (showUnlocks) {
+      hoverNode.unlocks.forEach(id => highlighted.add(id))
+    }
+    if (showRequires) {
+      hoverNode.requires.forEach(id => highlighted.add(id))
+    }
+    return highlighted
+  }, [hoverNode, showUnlocks, showRequires])
 
   // Filter graph data
   const filteredData = useMemo(() => {
@@ -137,12 +185,20 @@ export function GraphPage() {
     if (graphRef.current && searchQuery) {
       const node = filteredData.nodes.find(n => n.id === searchQuery.toUpperCase())
       if (node) {
-        graphRef.current.centerAt(node.x, node.y, 1000)
-        graphRef.current.zoom(3, 1000)
+        if (viewMode === '2d') {
+          graphRef.current.centerAt(node.x, node.y, 1000)
+          graphRef.current.zoom(3, 1000)
+        } else {
+          graphRef.current.cameraPosition(
+            { x: (node.x || 0) + 100, y: (node.y || 0) + 100, z: (node.z || 0) + 100 },
+            node,
+            1000
+          )
+        }
         setSelectedNode(node)
       }
     }
-  }, [searchQuery, filteredData.nodes])
+  }, [searchQuery, filteredData.nodes, viewMode])
 
   const handleNodeClick = useCallback((node: UnitNode) => {
     setSelectedNode(node)
@@ -152,10 +208,26 @@ export function GraphPage() {
     })
     
     if (graphRef.current) {
-      graphRef.current.centerAt(node.x, node.y, 500)
-      graphRef.current.zoom(3, 500)
+      if (viewMode === '2d') {
+        graphRef.current.centerAt(node.x, node.y, 500)
+        graphRef.current.zoom(3, 500)
+      } else {
+        graphRef.current.cameraPosition(
+          { x: (node.x || 0) + 100, y: (node.y || 0) + 100, z: (node.z || 0) + 100 },
+          node,
+          1000
+        )
+      }
     }
-  }, [setSearchParams])
+  }, [setSearchParams, viewMode])
+
+  const handleNodeHover = useCallback((node: UnitNode | null) => {
+    setHoverNode(node)
+    // Change cursor style
+    if (containerRef.current) {
+      containerRef.current.style.cursor = node ? 'pointer' : 'default'
+    }
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -163,6 +235,39 @@ export function GraphPage() {
   }
   
   const plannerCodes = new Set(plannerUnits.map(u => u.code.toUpperCase()))
+
+  // Get node color based on settings
+  const getNodeColor = useCallback((node: UnitNode) => {
+    // Highlighted nodes (connected to hover)
+    if (hoverNode && highlightedNodes.has(node.id)) {
+      if (node.id === hoverNode.id) return '#ff6b6b' // hover node itself
+      return '#ffd93d' // connected nodes
+    }
+    // Planner units
+    if (plannerCodes.has(node.id)) return '#10b981'
+    // Selected node
+    if (selectedNode?.id === node.id) return '#3b82f6'
+    // Search match
+    if (searchQuery && node.id === searchQuery.toUpperCase()) return '#3b82f6'
+    // Color by school
+    if (colorBySchool && node.school) {
+      return getSchoolColor(node.school)
+    }
+    return '#60a5fa'
+  }, [hoverNode, highlightedNodes, plannerCodes, selectedNode, searchQuery, colorBySchool])
+
+  // Get link color based on hover state
+  const getLinkColor = useCallback((link: any) => {
+    if (!hoverNode) return '#3d528040'
+    
+    const sourceId = typeof link.source === 'string' ? link.source : link.source.id
+    const targetId = typeof link.target === 'string' ? link.target : link.target.id
+    
+    if (highlightedNodes.has(sourceId) && highlightedNodes.has(targetId)) {
+      return '#ffd93d80' // highlighted link
+    }
+    return '#3d528020' // dimmed
+  }, [hoverNode, highlightedNodes])
 
   if (loading) {
     return (
@@ -188,11 +293,57 @@ export function GraphPage() {
 
   const totalNodes = networkData?.nodes.length || 0
 
+  // Common graph props
+  const graphProps = {
+    ref: graphRef,
+    graphData: filteredData,
+    nodeId: "id" as const,
+    nodeLabel: (node: UnitNode) => `${node.id}: ${node.unit_name}`,
+    nodeColor: getNodeColor,
+    nodeRelSize: 6,
+    nodeVal: (node: UnitNode) => {
+      if (hoverNode && highlightedNodes.has(node.id)) return 2
+      if (plannerCodes.has(node.id)) return 2
+      return 1
+    },
+    linkColor: getLinkColor,
+    linkDirectionalArrowLength: 3,
+    linkDirectionalArrowRelPos: 1,
+    onNodeClick: handleNodeClick,
+    onNodeHover: handleNodeHover,
+    cooldownTicks: 100,
+    enableNodeDrag: true,
+  }
+
   return (
     <div className="h-[calc(100vh-4rem)] flex">
       {/* Sidebar Controls */}
-      <div className="w-80 bg-navy-900 border-r border-theme-primary p-4 flex flex-col overflow-hidden shrink-0">
+      <div className="w-80 bg-theme-secondary border-r border-theme-primary p-4 flex flex-col overflow-hidden shrink-0">
         <h2 className="text-lg font-display font-bold text-theme-primary mb-4">Graph Controls</h2>
+        
+        {/* View Mode Toggle */}
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => setViewMode('2d')}
+            className={`flex-1 py-2 px-3 rounded-lg font-medium transition-colors ${
+              viewMode === '2d' 
+                ? 'bg-electric text-navy-950' 
+                : 'bg-theme-card text-theme-tertiary hover:text-theme-primary'
+            }`}
+          >
+            2D
+          </button>
+          <button
+            onClick={() => setViewMode('3d')}
+            className={`flex-1 py-2 px-3 rounded-lg font-medium transition-colors ${
+              viewMode === '3d' 
+                ? 'bg-electric text-navy-950' 
+                : 'bg-theme-card text-theme-tertiary hover:text-theme-primary'
+            }`}
+          >
+            3D
+          </button>
+        </div>
         
         {/* Planner Mode Toggle */}
         {plannerUnits.length > 0 && (
@@ -202,7 +353,7 @@ export function GraphPage() {
                 type="checkbox"
                 checked={plannerMode}
                 onChange={(e) => setPlannerMode(e.target.checked)}
-                className="w-4 h-4 rounded border-navy-600 bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
+                className="w-4 h-4 rounded border-theme-primary bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
               />
               <div>
                 <span className="text-theme-primary font-medium">Show Planner Units</span>
@@ -245,20 +396,29 @@ export function GraphPage() {
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
+              checked={colorBySchool}
+              onChange={(e) => setColorBySchool(e.target.checked)}
+              className="w-4 h-4 rounded border-theme-primary bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
+            />
+            <span className="text-theme-secondary">Color by School</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
               checked={showUnlocks}
               onChange={(e) => setShowUnlocks(e.target.checked)}
-              className="w-4 h-4 rounded border-navy-600 bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
+              className="w-4 h-4 rounded border-theme-primary bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
             />
-            <span className="text-gray-300">Show Unlocks</span>
+            <span className="text-theme-secondary">Show Unlocks</span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={showRequires}
               onChange={(e) => setShowRequires(e.target.checked)}
-              className="w-4 h-4 rounded border-navy-600 bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
+              className="w-4 h-4 rounded border-theme-primary bg-theme-card text-electric focus:ring-electric focus:ring-offset-0"
             />
-            <span className="text-gray-300">Show Prerequisites</span>
+            <span className="text-theme-secondary">Show Prerequisites</span>
           </label>
         </div>
 
@@ -270,8 +430,8 @@ export function GraphPage() {
         
         {/* Warning for large graphs */}
         {filteredData.nodes.length > 1000 && (
-          <div className="mb-4 p-3 bg-amber/10 border border-amber/30 rounded-lg">
-            <p className="text-xs text-amber-bright">
+          <div className="mb-4 p-3 bg-amber-100 dark:bg-amber/10 border border-amber-300 dark:border-amber/30 rounded-lg">
+            <p className="text-xs text-amber-700 dark:text-amber-bright">
               ⚠️ Large graph may be slow. Use filters to narrow down.
             </p>
           </div>
@@ -280,10 +440,23 @@ export function GraphPage() {
         {/* Selected Node Info */}
         {selectedNode && (
           <div className="mt-auto p-4 bg-theme-card rounded-xl border border-theme-primary">
-            <h3 className="font-mono text-lg text-electric-bright mb-1">
-              {selectedNode.id}
-            </h3>
-            <p className="text-theme-primary font-medium mb-3">
+            <div className="flex items-start justify-between mb-1">
+              <h3 className="font-mono text-lg text-electric-bright">
+                {selectedNode.id}
+              </h3>
+              <a
+                href={`https://handbook.monash.edu/current/units/${selectedNode.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-theme-tertiary hover:text-electric transition-colors"
+                title="Open in Monash Handbook"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+            <p className="text-theme-primary font-medium mb-2">
               {selectedNode.unit_name}
             </p>
             <p className="text-sm text-theme-tertiary mb-3 line-clamp-1">
@@ -293,7 +466,7 @@ export function GraphPage() {
               <span className="px-2 py-0.5 bg-electric/20 text-electric-bright rounded">
                 Unlocks: {selectedNode.unlocks.length}
               </span>
-              <span className="px-2 py-0.5 bg-amber/20 text-amber-bright rounded">
+              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber/20 text-amber-700 dark:text-amber-bright rounded">
                 Requires: {selectedNode.requires.length}
               </span>
             </div>
@@ -310,31 +483,22 @@ export function GraphPage() {
       {/* Graph Canvas */}
       <div ref={containerRef} className="flex-1 bg-theme-primary min-w-0">
         {filteredData.nodes.length > 0 ? (
-          <ForceGraph2D
-            ref={graphRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            graphData={filteredData}
-            nodeId="id"
-            nodeLabel={(node: UnitNode) => `${node.id}: ${node.unit_name}`}
-            nodeColor={(node: UnitNode) => {
-              // Highlight planner units
-              if (plannerCodes.has(node.id)) return '#10b981' // success green
-              if (selectedNode?.id === node.id) return '#3b82f6'
-              if (searchQuery && node.id === searchQuery.toUpperCase()) return '#3b82f6'
-              return '#60a5fa40'
-            }}
-            nodeRelSize={6}
-            nodeVal={(node: UnitNode) => plannerCodes.has(node.id) ? 2 : 1}
-            linkColor={() => '#3d528040'}
-            linkDirectionalArrowLength={3}
-            linkDirectionalArrowRelPos={1}
-            onNodeClick={handleNodeClick}
-            cooldownTicks={100}
-            onEngineStop={() => graphRef.current?.zoomToFit(400)}
-            enableNodeDrag={true}
-            backgroundColor="#0a0f1a"
-          />
+          viewMode === '2d' ? (
+            <ForceGraph2D
+              {...graphProps}
+              width={dimensions.width}
+              height={dimensions.height}
+              onEngineStop={() => graphRef.current?.zoomToFit(400)}
+              backgroundColor={theme === 'dark' ? '#0a0f1a' : '#f8fafc'}
+            />
+          ) : (
+            <ForceGraph3D
+              {...graphProps}
+              width={dimensions.width}
+              height={dimensions.height}
+              backgroundColor={theme === 'dark' ? '#0a0f1a' : '#f8fafc'}
+            />
+          )
         ) : (
           <div className="h-full flex items-center justify-center">
             <div className="text-center text-theme-tertiary">

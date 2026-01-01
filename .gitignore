@@ -23,8 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Data files (large, copy from monash_hbpp)
-public/data/*.json
+# Data files - now committed for deployment
+# public/data/*.json
 
 
 
