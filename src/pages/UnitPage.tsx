@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useUnit, useUnitsData } from '@/hooks/useData'
 import { getUnitCost, getSemestersFromOfferings, hasExam } from '@/types'
 import { usePlannerStore } from '@/stores/plannerStore'
@@ -44,8 +45,39 @@ export function UnitPage() {
   const semesters = getSemestersFromOfferings(unit.offerings)
   const hasExamAssessment = hasExam(unit.assessments)
 
+  // Build meta description
+  const metaDescription = [
+    `${unit.code} - ${unit.title}`,
+    `${unit.credit_points} Credit Points`,
+    cost > 0 ? `$${cost} (Band ${String(unit.sca_band).replace(/\D/g, '')})` : null,
+    unit.school,
+    semesters.length > 0 ? `Offered: ${semesters.join(', ')}` : null,
+    hasExamAssessment ? 'Has Exam' : unit.assessments?.length ? 'No Exam' : null,
+    unlocks.length > 0 ? `Unlocks ${unlocks.length} unit${unlocks.length > 1 ? 's' : ''}` : null,
+  ].filter(Boolean).join(' • ')
+
+  const pageTitle = `${unit.code} - ${unit.title} | Monash Handbook+`
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={metaDescription} />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:title" content={`${unit.code} - ${unit.title}`} />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="og:site_name" content="Monash Handbook+" />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={`${unit.code} - ${unit.title}`} />
+        <meta name="twitter:description" content={metaDescription} />
+      </Helmet>
+
       {/* Breadcrumb */}
       <nav className="mb-6">
         <Link to="/" className="text-theme-tertiary hover:text-electric transition-colors">
